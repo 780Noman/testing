@@ -53,7 +53,7 @@ def configure_llm():
         st.error("Something went wrong. Please try again later.")
         st.stop()
 
-    llm = ChatOpenAI(model_name=model, temperature=0, streaming=True, api_key=openai_api_key,max_tokens=50)
+    llm = ChatOpenAI(model_name=model, temperature=0, streaming=True, api_key=openai_api_key,max_tokens=500)
     return llm
 
 def sync_st_session():
