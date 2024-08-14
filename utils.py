@@ -1,61 +1,110 @@
-import os
-import openai
 import streamlit as st
-from datetime import datetime
-from langchain_openai import ChatOpenAI
+from audio_recorder_streamlit import audio_recorder
+from groq import Groq
+from langchain_groq import ChatGroq
+from langchain_core.messages import AIMessage, HumanMessage
+from langchain_core.output_parsers import StrOutputParser
+from langchain_core.prompts import ChatPromptTemplate
+from gtts import gTTS
+from io import BytesIO
+from pydub import AudioSegment
+import tempfile
+import os
+import re
 
-def enable_chat_history(func):
-    def wrapper(*args, **kwargs):
-        if "messages" not in st.session_state:
-            st.session_state["messages"] = [{"role": "assistant", "content": "How can I help you?"}]
-        
-        # Display the chat history
-        for msg in st.session_state["messages"]:
-            st.chat_message(msg["role"]).write(msg["content"])
-        
-        func(*args, **kwargs)
-
-    return wrapper
-
-def display_msg(msg, author):
-    """Method to display message on the UI
-
-    Args:
-        msg (str): message to display
-        author (str): author of the message - user/assistant
-    """
-    if "messages" not in st.session_state:
-        st.session_state["messages"] = []
-    
-    st.session_state.messages.append({"role": author, "content": msg})
-    st.chat_message(author).write(msg)
-
-def configure_llm():
-    openai_api_key = st.secrets['secrets']["OPENAI_API_KEY"]
-
-    model = "gpt-4"  # Default model; adjust as necessary
-
+def audio_bytes_to_wav(audio_bytes):
     try:
-        client = openai.Client(api_key=openai_api_key)
-        available_models = [{"id": i.id, "created": datetime.fromtimestamp(i.created)} for i in client.models.list() if str(i.id).startswith("gpt")]
-        available_models = sorted(available_models, key=lambda x: x["created"])
-        available_models = [i["id"] for i in available_models]
-
-        model = st.sidebar.selectbox(
-            label="Model",
-            options=available_models,
-            key="SELECTED_OPENAI_MODEL"
-        )
-    except openai.AuthenticationError as e:
-        st.error(e.body["message"])
-        st.stop()
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as temp_wav:
+            with open(temp_wav.name, "wb") as f:
+                f.write(audio_bytes)
+            return temp_wav.name
     except Exception as e:
-        st.error("Something went wrong. Please try again later.")
-        st.stop()
+        st.error(f"Error during WAV file conversion: {e}")
+        return None
 
-    llm = ChatOpenAI(model_name=model, temperature=0, streaming=True, api_key=openai_api_key,max_tokens=500)
-    return llm
+def speech_to_text(audio_bytes):
+    try:
+        temp_wav_path = audio_bytes_to_wav(audio_bytes)
+        
+        if temp_wav_path is None:
+            return "Error"
+        
+        # Use Groq's Whisper API for transcription
+        with open(temp_wav_path, "rb") as file:
+            transcription = client.audio.transcriptions.create(
+                file=(temp_wav_path, file.read()),
+                model="whisper-large-v3",
+                response_format="text",  # Other options: "json", "verbose_json"
+                language="ur",  # Set language to Urdu
+                temperature=0.0  # Optional, controls the variability of the output
+            )
+    except Exception as e:
+        st.error(f"Error during speech-to-text conversion: {e}")
+        transcription = "Error"
+    # Do not clean up the temp file
+    
+    return transcription
 
-def sync_st_session():
-    for k, v in st.session_state.items():
-        st.session_state[k] = v
+def text_to_speech(text):
+    try:
+        # Use gTTS to convert text to speech in Urdu
+        tts = gTTS(text=text, lang='ur')  # Set language to Urdu
+        with tempfile.NamedTemporaryFile(delete=False, suffix='.mp3') as f:
+            tts.save(f.name)
+            audio = AudioSegment.from_mp3(f.name)
+    except Exception as e:
+        st.error(f"Error during text-to-speech conversion: {e}")
+        audio = AudioSegment.silent(duration=1000)  # Return silent audio in case of error
+    # Do not clean up the temp file
+    
+    return audio
+
+def remove_punctuation(text):
+    # Remove punctuation from the text
+    return re.sub(r'[^\w\s]', '', text)
+
+def get_llm_response(query, chat_history):
+    try:
+        # Updated template with detailed guidelines
+        template = """
+                You are a highly qualified female psychiatrist with extensive experience in Pakistani mental health, specializing in Pakistan. Provide professional, empathetic, and culturally authentic advice and answers to the user's questions. Use everyday language, incorporating local idioms and expressions. Avoid using loanwords from other languages. **Keep your response within [token_limit] tokens.**
+
+                    **Key Considerations:**
+                    * **Professionalism:** Maintain a high level of expertise and ethical standards.
+                    * **Cultural Authenticity:** Deeply understand and reflect the values, beliefs, and customs of Pakistan.
+                    * **Empathy:** Show genuine compassion and support for the user's emotional well-being.
+
+                    **Chat History:** {chat_history}
+
+                    **User:** {user_query}
+
+        """
+
+        prompt = ChatPromptTemplate.from_template(template)
+        chain = prompt | llm | StrOutputParser()
+
+        response_gen = chain.stream({
+            "chat_history": chat_history,
+            "user_query": query
+        })
+
+        # Combine all parts of the response and apply text clean-up
+        response_text = ''.join(list(response_gen))
+        response_text = remove_punctuation(response_text)
+
+        # Remove repeated text
+        response_lines = response_text.split('\n')
+        unique_lines = list(dict.fromkeys(response_lines))  # Remove duplicates while preserving order
+        cleaned_response = '\n'.join(unique_lines)
+
+        return cleaned_response
+    except Exception as e:
+        st.error(f"Error during LLM response generation: {e}")
+        return "Error"
+
+def create_welcome_message():
+    welcome_text = "ہیلو، میں آپ کی چیٹ بوٹ اسسٹنٹ ہوں۔ میں آپ کی کس طرح مدد کر سکتی ہوں؟"  # Urdu greeting with female pronoun
+    tts = gTTS(text=welcome_text, lang='ur')
+    with tempfile.NamedTemporaryFile(delete=False, suffix='.mp3') as f:
+        tts.save(f.name)
+        return f.name
