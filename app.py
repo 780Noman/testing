@@ -13,6 +13,16 @@ import os
 import re
 
 from utils import *
+
+# Load the API key from Streamlit secrets
+api_key = st.secrets['secrets']["API_KEY"]
+
+# Initialize the Groq client
+client = Groq(api_key=api_key)
+
+# Initialize the Groq model for LLM responses
+llm = ChatGroq(model="llama-3.1-70b-versatile", api_key=api_key, max_tokens=500)  # Limit tokens to 100
+
 def main():
     st.set_page_config(page_title='Audio-based Multimodal Chatbot')
     st.title("🎤 :blue[Urdu Voice Chatbot] 💬🤖")
