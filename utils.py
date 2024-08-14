@@ -12,6 +12,15 @@ import tempfile
 import os
 import re
 
+# Load the API key from Streamlit secrets
+api_key = st.secrets['secrets']["API_KEY"]
+
+# Initialize the Groq client
+client = Groq(api_key=api_key)
+
+# Initialize the Groq model for LLM responses
+llm = ChatGroq(model="llama-3.1-70b-versatile", api_key=api_key, max_tokens=500)  # Limit tokens to 100
+
 def audio_bytes_to_wav(audio_bytes):
     try:
         with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as temp_wav:
