@@ -1,3 +1,4 @@
+ffmpeg 
 audio-recorder-streamlit
 gtts
 pydub
