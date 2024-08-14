@@ -1,18 +1,19 @@
-import streamlit as st
-from audio_recorder_streamlit import audio_recorder
+# app.py
+import tempfile
+import re
+from io import BytesIO
+from gtts import gTTS
+from pydub import AudioSegment
 from groq import Groq
 from langchain_groq import ChatGroq
 from langchain_core.messages import AIMessage, HumanMessage
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.prompts import ChatPromptTemplate
-from gtts import gTTS
-from io import BytesIO
-from pydub import AudioSegment
-import tempfile
-import os
-import re
+import streamlit as st
+from audio_recorder_streamlit import audio_recorder
+from utils import audio_bytes_to_wav, speech_to_text, text_to_speech, get_llm_response, create_welcome_message
+from langchain_core.messages import AIMessage, HumanMessage
 
-from utils import *
 
 def main():
     st.set_page_config(page_title='Audio-based Multimodal Chatbot')
