@@ -1,17 +1,16 @@
-import streamlit as st
-from audio_recorder_streamlit import audio_recorder
+# utils.py
+
+import tempfile
+import re
+from io import BytesIO
+from gtts import gTTS
+from pydub import AudioSegment
 from groq import Groq
 from langchain_groq import ChatGroq
 from langchain_core.messages import AIMessage, HumanMessage
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.prompts import ChatPromptTemplate
-from gtts import gTTS
-from io import BytesIO
-from pydub import AudioSegment
-import tempfile
-import os
-import re
-
+import streamlit as st
 # Load the API key from Streamlit secrets
 api_key = st.secrets['secrets']["API_KEY"]
 
@@ -50,7 +49,6 @@ def speech_to_text(audio_bytes):
     except Exception as e:
         st.error(f"Error during speech-to-text conversion: {e}")
         transcription = "Error"
-    # Do not clean up the temp file
     
     return transcription
 
@@ -64,7 +62,6 @@ def text_to_speech(text):
     except Exception as e:
         st.error(f"Error during text-to-speech conversion: {e}")
         audio = AudioSegment.silent(duration=1000)  # Return silent audio in case of error
-    # Do not clean up the temp file
     
     return audio
 
