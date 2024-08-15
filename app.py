@@ -26,12 +26,16 @@ def main():
     if "chat_histories" not in st.session_state:
         st.session_state.chat_histories = []
 
+    if "played_audios" not in st.session_state:
+        st.session_state.played_audios = {}  # To track if an audio file has been played
+
     # Handle the initial chat history setup
     if len(st.session_state.chat_history) == 0:
         welcome_audio_path = create_welcome_message()
         st.session_state.chat_history = [
             AIMessage(content='ہیلو، میں آپ کی چیٹ بوٹ اسسٹنٹ ہوں۔ میں آپ کی کس طرح مدد کر سکتی ہوں؟', audio_file=welcome_audio_path)  # Urdu greeting with female pronoun
         ]
+        st.session_state.played_audios[welcome_audio_path] = False
 
     # Sidebar with mic button on top
     with st.sidebar:
@@ -70,6 +74,7 @@ def main():
 
                 # Append AI response text and audio to history
                 st.session_state.chat_history.append(AIMessage(content=response, audio_file=audio_response_file_path))
+                st.session_state.played_audios[audio_response_file_path] = False  # Mark the new response as not played
         
         if st.button("New Chat"):
             # Save the current chat history to the chat_histories list
@@ -79,6 +84,7 @@ def main():
             st.session_state.chat_history = [
                 AIMessage(content='ہیلو، میں آپ کی چیٹ بوٹ اسسٹنٹ ہوں۔ میں آپ کی کس طرح مدد کر سکتی ہوں؟', audio_file=welcome_audio_path)  # Urdu greeting with female pronoun
             ]
+            st.session_state.played_audios[welcome_audio_path] = False
     
         if st.session_state.chat_histories:
             st.subheader("Chat History")
@@ -90,14 +96,17 @@ def main():
     for message in st.session_state.chat_history:
         if isinstance(message, AIMessage):
             with st.chat_message("AI"):
-                st.write(message.content)
+                # Check if the audio file has already been played
                 if hasattr(message, 'audio_file'):
-                    st.audio(message.audio_file, format="audio/mp3", autoplay=False)  # Do not autoplay the audio response
+                    if not st.session_state.played_audios.get(message.audio_file, False):
+                        st.audio(message.audio_file, format="audio/mp3", autoplay=True)
+                        st.session_state.played_audios[message.audio_file] = True  # Mark as played
+                    else:
+                        st.audio(message.audio_file, format="audio/mp3", autoplay=False)
         elif isinstance(message, HumanMessage):
-            with st.chat_message('Human'):
-                st.write(message.content)
+            with st.chat_message("user"):
                 if hasattr(message, 'audio_file'):
-                    st.audio(message.audio_file, format="audio/wav")
+                    st.audio(message.audio_file, format="audio/wav", autoplay=False)
 
 if __name__ == "__main__":
     main()
