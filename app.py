@@ -1,4 +1,3 @@
-# app.py
 import tempfile
 import re
 from io import BytesIO
@@ -12,12 +11,12 @@ from langchain_core.prompts import ChatPromptTemplate
 import streamlit as st
 from audio_recorder_streamlit import audio_recorder
 from utils import audio_bytes_to_wav, speech_to_text, text_to_speech, get_llm_response, create_welcome_message
-from langchain_core.messages import AIMessage, HumanMessage
-
 
 def main():
-    st.set_page_config(page_title='Audio-based Multimodal Chatbot')
-    st.title("🎤 :blue[Urdu Voice Chatbot] 💬🤖")
+    st.set_page_config(page_title='آڈیو پر مبنی چیٹ بوٹ')
+    st.title("🎤 :blue[اردو ماہر نفسیات وائس چیٹ بوٹ] 💬🤖")
+    st.sidebar.markdown("# Aibytec")
+    st.sidebar.image('logo.jpg', width=20, use_column_width=True)
 
     # Initialize chat history if not already present
     if "chat_history" not in st.session_state:
@@ -33,20 +32,24 @@ def main():
     if len(st.session_state.chat_history) == 0:
         welcome_audio_path = create_welcome_message()
         st.session_state.chat_history = [
-            AIMessage(content='ہیلو، میں آپ کی چیٹ بوٹ اسسٹنٹ ہوں۔ میں آپ کی کس طرح مدد کر سکتی ہوں؟', audio_file=welcome_audio_path)  # Urdu greeting with female pronoun
+            AIMessage(content="السلام علیکم میں آپ کی چیٹ بوٹ اسسٹنٹ ہوں۔ میں آپ کی کس طرح مدد کر سکتی ہوں؟", audio_file=welcome_audio_path)  # Urdu greeting with female pronoun
         ]
         st.session_state.played_audios[welcome_audio_path] = False
 
     # Sidebar with mic button on top
     with st.sidebar:
+        # Show "Speaking..." message during recording
         audio_bytes = audio_recorder(
-            text="Record your voice message",
+            energy_threshold=0.01,
+            pause_threshold=0.8,
+            text="Speak now...max 5 min",
             recording_color="#e8b62c",
             neutral_color="#6aa36f",
             icon_name="microphone",
             icon_size="2x"  # Adjust the icon size
         )
-        
+        st.info("")  # Clear the "Speaking..." message after recording
+
         if audio_bytes:
             # Save the user input audio file
             temp_audio_path = audio_bytes_to_wav(audio_bytes)
@@ -75,23 +78,23 @@ def main():
                 # Append AI response text and audio to history
                 st.session_state.chat_history.append(AIMessage(content=response, audio_file=audio_response_file_path))
                 st.session_state.played_audios[audio_response_file_path] = False  # Mark the new response as not played
-        
+
         if st.button("New Chat"):
             # Save the current chat history to the chat_histories list
             st.session_state.chat_histories.append(st.session_state.chat_history)
             # Initialize a new chat history with the default welcome message
             welcome_audio_path = create_welcome_message()
             st.session_state.chat_history = [
-                AIMessage(content='ہیلو، میں آپ کی چیٹ بوٹ اسسٹنٹ ہوں۔ میں آپ کی کس طرح مدد کر سکتی ہوں؟', audio_file=welcome_audio_path)  # Urdu greeting with female pronoun
+                 AIMessage(content="السلام علیکم میں آپ کی چیٹ بوٹ اسسٹنٹ ہوں۔ میں آپ کی کس طرح مدد کر سکتی ہوں؟", audio_file=welcome_audio_path)  # Urdu greeting with female pronoun
             ]
             st.session_state.played_audios[welcome_audio_path] = False
-    
+
         if st.session_state.chat_histories:
             st.subheader("Chat History")
             for i, hist in enumerate(st.session_state.chat_histories):
                 if st.button(f"Chat {i + 1}", key=f"chat_{i}"):
                     st.session_state.chat_history = hist
-    
+
     # Display the conversation history in the main area
     for message in st.session_state.chat_history:
         if isinstance(message, AIMessage):

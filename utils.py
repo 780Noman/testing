@@ -11,7 +11,7 @@ from langchain_core.messages import AIMessage, HumanMessage
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.prompts import ChatPromptTemplate
 import streamlit as st
-
+import os
 # Load the API key from Streamlit secrets
 api_key = st.secrets['secrets']["API_KEY"]
 
@@ -31,29 +31,46 @@ def audio_bytes_to_wav(audio_bytes):
         st.error(f"Error during WAV file conversion: {e}")
         return None
 
+def split_audio(file_path, chunk_length_ms):
+    audio = AudioSegment.from_wav(file_path)
+    return [audio[i:i + chunk_length_ms] for i in range(0, len(audio), chunk_length_ms)]
+
 def speech_to_text(audio_bytes):
     try:
+        # Convert the audio bytes to WAV
         temp_wav_path = audio_bytes_to_wav(audio_bytes)
-        
+
         if temp_wav_path is None:
             return "Error"
-        
-        # Use Groq's Whisper API for transcription
-        with open(temp_wav_path, "rb") as file:
-            transcription = client.audio.transcriptions.create(
-                file=(temp_wav_path, file.read()),
-                model="whisper-large-v3",
-                response_format="text",  # Other options: "json", "verbose_json"
-                language="ur",  # Set language to Urdu
-                temperature=0.0  # Optional, controls the variability of the output
-            )
+
+        # Increase file size limit
+        if os.path.getsize(temp_wav_path) > 50 * 1024 * 1024:
+            st.error("File size exceeds the 50 MB limit. Please upload a smaller file.")
+            return "Error"
+
+        # Define chunk length (e.g., 5 minutes = 5 * 60 * 1000 milliseconds)
+        chunk_length_ms = 5 * 60 * 1000
+        chunks = split_audio(temp_wav_path, chunk_length_ms)
+
+        transcription = ""
+        for chunk in chunks:
+            with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as temp_chunk:
+                chunk.export(temp_chunk.name, format="wav")
+                with open(temp_chunk.name, "rb") as file:
+                    chunk_transcription = client.audio.transcriptions.create(
+                        file=("audio.wav", file.read()),
+                        model="whisper-large-v3",
+                        response_format="text",
+                        language="ur",
+                        temperature=0.0,
+
+                    )
+                    transcription += chunk_transcription + " "
+
+        return transcription.strip()
     except Exception as e:
         st.error(f"Error during speech-to-text conversion: {e}")
-        transcription = "Error"
-    # Do not clean up the temp file
-    
-    return transcription
-
+        return "Error"
 def text_to_speech(text):
     try:
         # Use gTTS to convert text to speech in Urdu
@@ -76,12 +93,25 @@ def get_llm_response(query, chat_history):
     try:
         # Updated template with detailed guidelines
         template = """
-                You are a highly qualified female psychiatrist with extensive experience in Pakistani mental health, specializing in Pakistan. Provide professional, empathetic, and culturally authentic advice and answers to the user's questions. Use everyday language, incorporating local idioms and expressions. Avoid using loanwords from other languages. **Keep your response within [token_limit] tokens.**
+                
+              آپ ایک اعلیٰ تعلیم یافتہ اردو خاتون سائیکاٹرسٹ اسسٹنٹ چیٹ بوٹ ہیں جن کا نام "ماہر نفسیات ہے۔
+               "ذہنی صحت کے وسیع تجربے کے ساتھ۔ آپ کا کردار پیشہ ورانہ، ہمدردانہ،
+                 اور ثقافتی طور پر مستند مشورہ اور صارف کے سوالات کے جوابات فراہم کرنا ہے۔
+                 آپ روزمرہ کی زبان کا استعمال کرتے ہوئے بات چیت کرتے ہیں، مقامی محاورات
+                   اور تاثرات کو شامل کرتے ہوئے دوسری زبانوں کے قرض کے الفاظ سے گریز کرتے ہیں۔
 
-                    **Key Considerations:**
-                    * **Professionalism:** Maintain a high level of expertise and ethical standards.
-                    * **Cultural Authenticity:** Deeply understand and reflect the values, beliefs, and customs of Pakistan.
-                    * **Empathy:** Show genuine compassion and support for the user's emotional well-being.
+                آپ کی مہارت صرف دماغی صحت سے متعلق معلومات اور مشورے فراہم کرنے میں ہے۔ 
+                اگر کوئی سوال دماغی صحت کے دائرہ کار سے باہر آتا ہے، تو آپ کو اس کے ساتھ جواب دینا چاہیے،
+                  "میں صرف دماغی صحت سے متعلق سوالات میں مہارت رکھتا ہوں۔"
+
+                اہم تحفظات:
+
+                پیشہ ورانہ مہارت: اعلیٰ سطح کی مہارت اور اخلاقی معیارات کو برقرار رکھنا۔
+                ثقافتی صداقت: صارف کے ثقافتی سیاق و سباق سے متعلقہ اقدار، عقائد اور رسم و رواج کو سمجھیں اور ان کی عکاسی کریں۔
+                ہمدردی: صارف کی جذباتی بہبود کے لیے حقیقی ہمدردی اور تعاون کا مظاہرہ کریں۔
+                آپ اس سے باہر معلومات فراہم نہیں کرتے ہیں۔ 
+                  دائرہ کار اگر کوئی سوال ماہر نفسیات، دماغی صحت کے بارے میں نہیں ہے، تو اس کے ساتھ جواب دیں،
+                 "میں صرف ماہر نفسیات، دماغی صحت سے متعلق سوالات میں مہارت رکھتا ہوں۔" 
 
                     **Chat History:** {chat_history}
 
@@ -112,7 +142,7 @@ def get_llm_response(query, chat_history):
         return "Error"
 
 def create_welcome_message():
-    welcome_text = "ہیلو، میں آپ کی چیٹ بوٹ اسسٹنٹ ہوں۔ میں آپ کی کس طرح مدد کر سکتی ہوں؟"  # Urdu greeting with female pronoun
+    welcome_text = "السلام علیکم میں آپ کی چیٹ بوٹ اسسٹنٹ ہوں۔ میں آپ کی کس طرح مدد کر سکتی ہوں؟"  # Urdu greeting with female pronoun
     tts = gTTS(text=welcome_text, lang='ur')
     with tempfile.NamedTemporaryFile(delete=False, suffix='.mp3') as f:
         tts.save(f.name)
