@@ -1,7 +1,7 @@
 
 # Urdu اردو ماہر نفسیات Voice Chatbot - Streamlit
 
-Welcome to the Urdu اردو ماہر نفسیات Voice Chatbot project! This repository showcases a Streamlit application that allows users to interact with a chatbot using Urdu voice input and receive responses in Urdu.
+Welcome to the Urdu اردو ماہر نفسیات Voice Chatbot project! collabration with [ aibytech ](https://www.aibytech.com/) This repository showcases a Streamlit application that allows users to interact with a chatbot using Urdu voice input and receive responses in Urdu.
 The Urdu Voice Chatbot is designed to The Urdu Voice Chatbot is designed to provide a voice-interactive, AI-powered conversational assistant specializing in mental health advice. The chatbot can transcribe spoken Urdu into text, generate appropriate AI responses in Urdu, and convert the generated text back into speech for a seamless voice-based interaction.:
 ## 🚀 **Models Used Groq LLM:**
 
